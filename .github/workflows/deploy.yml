@@ -1,0 +1,31 @@
+name: Deploy
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+permissions: { contents: read, pages: write, id-token: write }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site
+        run: |
+          mkdir -p site wasm src
+          unzip -q scad-viewer.zip -d src
+          curl -fL -o wasm.zip "https://files.openscad.org/playground/OpenSCAD-2025.03.25.wasm24456-WebAssembly-web.zip"
+          unzip -q wasm.zip -d wasm
+          find wasm -type f | head -20
+          JS=$(find wasm -name openscad.js | head -1)
+          test -n "$JS" || { echo "openscad.js not found in zip"; exit 1; }
+          cp "$(dirname "$JS")"/openscad.* site/
+          cp -r src/scad-viewer/app/* site/
+          ls -la site
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.d.outputs.page_url }}" }
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
